@@ -23,7 +23,9 @@ import ssl
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(current_dir)
+sys.path.insert(0, os.path.dirname(current_dir))
 
 import tornado.gen
 import tornado.ioloop

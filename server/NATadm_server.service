@@ -1,0 +1,11 @@
+[Unit]
+Description=NATadm server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/NATadm/server/NATadm_server.py
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,4 +1,4 @@
-logging = 'debug'
+logging = 'info'
 log_to_stderr = True
 log_file_prefix = 'NATadm_server.log'
 
