@@ -14,3 +14,10 @@ communication_server_certificate = (
 	'../certs/communication.crt.pem',
 	'../certs/communication.key.pem'
 )
+
+services = {
+	10022: {
+		'client': 'foo bar',
+		'port': 22
+	}
+}

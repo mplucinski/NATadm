@@ -45,6 +45,8 @@ tornado.options.define('control_client_ca', type=str)
 tornado.options.define('communication_port', type=int)
 tornado.options.define('communication_server_certificate', type=tuple)
 
+tornado.options.define('services', type=dict)
+
 tornado.options.parse_config_file(CONFIG_FILE, False)
 tornado.options.parse_command_line()
 
@@ -72,12 +74,17 @@ class Server(tornado.tcpserver.TCPServer):
 			if package.name in self.requests_table:
 				(client_port, server_port) = self.requests_table[package.name]
 				del self.requests_table[package.name]
-				logging.info('Client \"{}\" will forward it\'s port {} to local {}'.format(package.name, client_port, server_port))
-				forward = ForwardServer()
-				forward.listen(server_port)
 				yield common.protocol.create_tunnel(client_port).write(stream)
-				logging.info('Waiting for connections on {}'.format(server_port))
-				(server_stream, server_address) = yield forward.accept()
+				if isinstance(server_port, ForwardServer):
+					logging.info('Client \"{}\" will forward it\'s port {} to awaiting connection'.format(package.name, client_port))
+					server_stream = server_port.awaiting_stream
+					server_address = server_port.awaiting_address
+				else:
+					logging.info('Client \"{}\" will forward it\'s port {} to local {}'.format(package.name, client_port, server_port))
+					forward = ForwardServer(self)
+					forward.listen(server_port)
+					logging.info('Waiting for connections on {}'.format(server_port))
+					(server_stream, server_address) = yield forward.accept()
 				logging.info('Incoming connection to be tunneled from {}'.format(server_address))
 				yield common.protocol.connect().write(stream)
 
@@ -96,9 +103,19 @@ class Server(tornado.tcpserver.TCPServer):
 				stream.close()
 
 class ForwardServer(tornado.tcpserver.TCPServer):
-	def __init__(self, *args, **kwargs):
+	def __init__(self, server, *args, **kwargs):
 		super(ForwardServer, self).__init__(*args, **kwargs)
+		self.server = server
 		self.accept_future = tornado.concurrent.Future()
+		self.target_client = None
+		self.target_port = None
+		self.awaiting_stream = None
+		self.awaiting_address = None
+
+	@tornado.gen.coroutine
+	def set_permanent_service(self, client, port):
+		self.target_client = client
+		self.target_port = port
 
 	def accept(self):
 		return self.accept_future
@@ -106,7 +123,15 @@ class ForwardServer(tornado.tcpserver.TCPServer):
 	@tornado.gen.coroutine
 	def handle_stream(self, stream, address):
 		logging.debug('Incoming connection to forward server')
-		self.accept_future.set_result((stream, address))
+		if self.target_client is None and self.target_port is None:
+			self.accept_future.set_result((stream, address))
+		else:
+			logging.info('User connected, will forward to {}:{}'.format(
+				self.target_client, self.target_port
+			))
+			self.server.requests_table[self.target_client] = (self.target_port, self)
+			self.awaiting_stream = stream
+			self.awaiting_address = address
 
 class ControlServer(tornado.tcpserver.TCPServer):
 	def __init__(self, server, *args, **kwargs):
@@ -188,6 +213,13 @@ def main():
 	control_server.listen(
 		tornado.options.options.control_port
 	)
+
+	for port, service in tornado.options.options.services.items():
+		logging.info('Listening on port {} for connections to forward to {}:{}'.format(port, service['client'], service['port']))
+
+		forward_server = ForwardServer(server)
+		forward_server.set_permanent_service(service['client'], service['port'])
+		forward_server.listen(port)
 
 	io_loop.start()
 
