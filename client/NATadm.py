@@ -51,6 +51,27 @@ def unexpected_package(package):
 	raise Exception('Unexpected package: '+package)
 
 @tornado.gen.coroutine
+def tunnel(client, stream, port):
+	logging.debug('Requested to create tunnel with local port {}'.format(port))
+
+	package = yield common.protocol.package.read(stream)
+	if not isinstance(package, common.protocol.connect):
+		unexpected_package(package)
+
+	logging.info('Connecting with local port {}...'.format(port))
+	local_client = tornado.tcpclient.TCPClient()
+	local_stream = yield client.connect(
+		'localhost', port
+	)
+
+	logging.info('Connection established with local port {}'.format(port))
+	proxy = common.proxy.Proxy(stream, local_stream)
+	yield proxy.run()
+
+	logging.debug('Closing tunnel...')
+	yield common.protocol.disconnect().write(stream)
+
+@tornado.gen.coroutine
 def main():
 	while True:
 		try:
@@ -68,28 +89,7 @@ def main():
 
 			package = yield common.protocol.package.read(stream)
 			if isinstance(package, common.protocol.create_tunnel):
-				port = package.port
-				logging.debug('Requested to create tunnel with local port {}'.format(port))
-
-				package = yield common.protocol.package.read(stream)
-				if not isinstance(package, common.protocol.connect):
-					unexpected_package(package)
-
-				logging.info('Connecting with local port {}...'.format(port))
-
-				local_client = tornado.tcpclient.TCPClient()
-				local_stream = yield client.connect(
-					'localhost', port
-				)
-
-				logging.info('Connection established with local port {}'.format(port))
-
-				proxy = common.proxy.Proxy(stream, local_stream)
-				yield proxy.run()
-
-				logging.debug('Closing tunnel...')
-				yield common.protocol.disconnect().write(stream)
-
+				tornado.ioloop.IOLoop.instance().add_callback(tunnel, client, stream, package.port)
 			elif isinstance(package, common.protocol.not_interested):
 				logging.info('Nobody interested in tunnel, disconnecting')
 				stream.close()
@@ -103,6 +103,7 @@ def main():
 			tornado.ioloop.IOLoop.instance().stop()
 			break
 
+		logging.warning('Waiting until next trial')
 		yield tornado.gen.Task(
 			tornado.ioloop.IOLoop.instance().add_timeout,
 			time.time()+tornado.options.options.interval
