@@ -103,7 +103,6 @@ def main():
 			tornado.ioloop.IOLoop.instance().stop()
 			break
 
-		logging.warning('Waiting until next trial')
 		yield tornado.gen.Task(
 			tornado.ioloop.IOLoop.instance().add_timeout,
 			time.time()+tornado.options.options.interval
