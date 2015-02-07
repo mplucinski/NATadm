@@ -14,6 +14,7 @@ communication_server_certificate = (
 	'../certs/communication.crt.pem',
 	'../certs/communication.key.pem'
 )
+communication_client_ca = '../certs/communication.ca.pem'
 
 services = {
 	10022: {

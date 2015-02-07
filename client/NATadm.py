@@ -35,11 +35,13 @@ import tornado.tcpclient
 
 import common.protocol
 import common.proxy
+import common.utils
 
 CONFIG_FILE = 'NATadm.conf'
 
 tornado.options.define('name', type=str)
 tornado.options.define('remote', type=tuple)
+tornado.options.define('certificate', type=tuple)
 tornado.options.define('cafile', type=str)
 tornado.options.define('interval', type=int, default=60)
 tornado.options.define('infinite', type=bool, default=False)
@@ -79,9 +81,10 @@ def main():
 			logging.info('Trying to connect {}:{} (client name "{}")...'.format(remote[0], remote[1], tornado.options.options.name))
 			client = tornado.tcpclient.TCPClient()
 			stream = yield client.connect(
-				remote[0], remote[1], ssl_options=dict(
-					ca_certs = tornado.options.options.cafile,
-					cert_reqs = ssl.CERT_REQUIRED
+				remote[0], remote[1], ssl_options=common.utils.ssl_options(
+					certfile=tornado.options.options.certificate[0],
+					keyfile=tornado.options.options.certificate[1],
+					cacerts=tornado.options.options.cafile
 				)
 			)
 			logging.debug('Connection established')

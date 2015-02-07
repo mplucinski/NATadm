@@ -35,6 +35,7 @@ import tornado.tcpserver
 
 import common.protocol
 import common.proxy
+import common.utils
 
 CONFIG_FILE = 'NATadm_server.conf'
 
@@ -44,6 +45,7 @@ tornado.options.define('control_client_ca', type=str)
 
 tornado.options.define('communication_port', type=int)
 tornado.options.define('communication_server_certificate', type=tuple)
+tornado.options.define('communication_client_ca', type=str)
 
 tornado.options.define('services', type=dict)
 
@@ -193,18 +195,18 @@ class ControlServer(tornado.tcpserver.TCPServer):
 def main():
 	io_loop = tornado.ioloop.IOLoop.instance()
 
-	server = Server(ssl_options=dict(
+	server = Server(ssl_options=common.utils.ssl_options(
 		certfile=tornado.options.options.communication_server_certificate[0],
-		keyfile=tornado.options.options.communication_server_certificate[1]
+		keyfile=tornado.options.options.communication_server_certificate[1],
+		cacerts=tornado.options.options.communication_client_ca
 	))
 	logging.info('Listening on port {} ...'.format(tornado.options.options.communication_port))
 	server.listen(tornado.options.options.communication_port)
 
-	control_server = ControlServer(server, ssl_options=dict(
+	control_server = ControlServer(server, ssl_options=common.utils.ssl_options(
 		certfile=tornado.options.options.control_server_certificate[0],
 		keyfile=tornado.options.options.control_server_certificate[1],
-		cert_reqs=ssl.CERT_REQUIRED,
-		ca_certs=tornado.options.options.control_client_ca
+		cacerts=tornado.options.options.control_client_ca
 	))
 
 	logging.info('Listening on control interface on {} ...'.format(

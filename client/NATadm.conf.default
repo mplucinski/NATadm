@@ -5,5 +5,9 @@ log_file_prefix = 'NATadm.log'
 name = 'foo bar'
 remote = ('example.com', 12345)
 cafile = '../certs/communication.ca.pem'
+certificate = (
+	'../certs/client.crt.pem',
+	'../certs/client.key.pem'
+)
 interval = 5
 infinite = True

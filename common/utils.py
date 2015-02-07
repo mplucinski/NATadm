@@ -17,8 +17,19 @@
 
 import io
 import logging
+import ssl
 
 import tornado.iostream
+import tornado.netutil
+
+def ssl_options(certfile, keyfile, cacerts):
+	context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+	context.options |= ssl.OP_NO_SSLv2
+	context.options |= ssl.OP_NO_SSLv3
+	context.load_cert_chain(certfile, keyfile)
+	context.verify_mode = ssl.CERT_REQUIRED
+	context.load_verify_locations(cacerts)
+	context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
 
 class FileIOStream(tornado.iostream.BaseIOStream):
 	def __init__(self, file, *args, **kwargs):
