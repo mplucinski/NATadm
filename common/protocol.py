@@ -28,8 +28,8 @@ sys.path.append(os.path.join(os.getcwd(), '..'))
 
 import common.utils
 
-DEFAULT_VERSION = 1
-MAX_VERSION = 1
+DEFAULT_VERSION = 2
+MAX_VERSION = 2
 
 class package:
 	@staticmethod
@@ -46,12 +46,13 @@ class package:
 		length = package._decode_length(length)
 		logging.debug('Reading package of {} B'.format(length))
 		pkg = yield stream.read_bytes(length)
+		logging.debug('Read package of {} B{}'.format(len(pkg), '' if len(pkg) > 100 else ' ({!r})'.format(pkg)))
 		return pickle.loads(pkg)
 
 	@tornado.gen.coroutine
 	def write(self, stream):
 		b = pickle.dumps(self)
-		logging.debug('Writing package of {} B'.format(len(b)))
+		logging.debug('Writing package of {} B{}'.format(len(b), '' if len(b) > 100 else ' ({!r})'.format(b)))
 		length = package._encode_length(len(b))
 		yield stream.write(length)
 		yield stream.write(b)
@@ -101,7 +102,8 @@ class create_tunnel(package):
 		self.port = port
 
 class connect(package):
-	pass
+	def __init__(self, original_client_address):
+		self.original_client_address = original_client_address
 
 class disconnect(package):
 	pass

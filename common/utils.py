@@ -15,6 +15,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import inspect
 import io
 import logging
 import ssl
@@ -26,9 +27,15 @@ def ssl_options(certfile, keyfile, cacerts):
 	context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
 	context.options |= ssl.OP_NO_SSLv2
 	context.options |= ssl.OP_NO_SSLv3
-	context.load_cert_chain(certfile, keyfile)
+	try:
+		context.load_cert_chain(certfile, keyfile)
+	except Exception as e:
+		raise Exception('Could not load certificates chain (cerfile: {!r}, keyfile: {!r})'.format(certfile, keyfile)) from e
 	context.verify_mode = ssl.CERT_REQUIRED
-	context.load_verify_locations(cacerts)
+	try:
+		context.load_verify_locations(cacerts)
+	except Exception as e:
+		raise Exception('Could not verify locations of certificates: {!r}'.format(cacerts)) from e
 	context.verify_flags = ssl.VERIFY_CRL_CHECK_CHAIN
 
 class FileIOStream(tornado.iostream.BaseIOStream):
@@ -58,3 +65,15 @@ class FileIOStream(tornado.iostream.BaseIOStream):
 			return None
 		return chunk
 
+def reformat_logger(prefix):
+	import tornado.log
+	signature = inspect.signature(tornado.log.LogFormatter)
+	fmt = signature.parameters['fmt'].default
+
+	class Wrapper(tornado.log.LogFormatter):
+		def __init__(self, **kwargs):
+			f = kwargs.get('fmt', fmt)
+			kwargs['fmt'] = '%(color)s' + prefix + '%(end_color)s ' + f
+			super(Wrapper, self).__init__(**kwargs)
+
+	tornado.log.LogFormatter = Wrapper

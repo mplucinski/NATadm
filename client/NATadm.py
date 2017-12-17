@@ -37,6 +37,8 @@ import common.protocol
 import common.proxy
 import common.utils
 
+common.utils.reformat_logger('CLIENT')
+
 CONFIG_FILE = 'NATadm.conf'
 
 tornado.options.define('name', type=str)
@@ -46,11 +48,21 @@ tornado.options.define('cafile', type=str)
 tornado.options.define('interval', type=int, default=60)
 tornado.options.define('infinite', type=bool, default=False)
 
-tornado.options.parse_config_file(CONFIG_FILE, False)
-tornado.options.parse_command_line()
+tornado.options.define('config_file', type=str)
+
+tornado.options.parse_command_line(None, False)
+
+config_file = tornado.options.options.config_file or CONFIG_FILE
+
+if len(config_file) != 0:
+	if not os.path.exists(config_file):
+		raise Exception('Not found: {!r}'.format(config_file))
+	tornado.options.parse_config_file(config_file, False)
+
+tornado.options.options.run_parse_callbacks()
 
 def unexpected_package(package):
-	raise Exception('Unexpected package: '+package)
+	raise Exception('Unexpected package: '.format(package))
 
 @tornado.gen.coroutine
 def tunnel(client, stream, port):
@@ -67,7 +79,7 @@ def tunnel(client, stream, port):
 	)
 
 	logging.info('Connection established with local port {}'.format(port))
-	proxy = common.proxy.Proxy(stream, local_stream)
+	proxy = common.proxy.Proxy('NATadm_server:{}'.format(package.original_client_address), stream, 'localhost:{}'.format(port), local_stream)
 	yield proxy.run()
 
 	logging.debug('Closing tunnel...')
@@ -75,6 +87,7 @@ def tunnel(client, stream, port):
 
 @tornado.gen.coroutine
 def main():
+	logging.info('=== NATadm client (protocol version: {}) ==='.format(common.protocol.MAX_VERSION))
 	while True:
 		try:
 			remote = tornado.options.options.remote

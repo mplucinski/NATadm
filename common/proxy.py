@@ -23,9 +23,24 @@ import tornado.ioloop
 
 import common.protocol
 
+def format_payload(payload):
+	s = 'payload of {} B ('.format(len(payload))
+
+	MAX = 512
+	MAX2 = int(MAX/2)
+	if len(payload) < MAX:
+		s += repr(payload)
+	else:
+		s += repr(payload[:MAX2]) + '...' + repr(payload[-MAX2:])
+
+	s += ')'
+	return s
+
 class Proxy:
-	def __init__(self, wrapped_stream, raw_stream):
+	def __init__(self, wrapped_stream_name, wrapped_stream, raw_stream_name, raw_stream):
+		self.wrapped_stream_name = wrapped_stream_name
 		self.wrapped_stream = wrapped_stream
+		self.raw_stream_name = raw_stream_name
 		self.raw_stream = raw_stream
 		self.finish_future = tornado.concurrent.Future()
 
@@ -37,7 +52,8 @@ class Proxy:
 				package = yield common.protocol.package.read(self.wrapped_stream)
 				if isinstance(package, common.protocol.payload):
 					payload = package.payload
-					logging.debug('WRAPPED -> RAW: {}'.format(repr(payload)))
+					logging.info('{} -> {}: {} B'.format(self.wrapped_stream_name, self.raw_stream_name, len(payload)))
+					logging.debug('WRAPPED -> RAW: ' + format_payload(payload))
 					yield self.raw_stream.write(payload)
 				elif isinstance(package, common.protocol.disconnect):
 					logging.debug('Disconnection of tunneled client, stopping proxy')
@@ -58,7 +74,8 @@ class Proxy:
 		try:
 			while True:
 				payload = yield self.raw_stream.read_bytes(2**24, partial=True)
-				logging.debug('RAW -> WRAPPED: {}'.format(repr(payload)))
+				logging.info('{} -> {}: {} B'.format(self.raw_stream_name, self.wrapped_stream_name, len(payload)))
+				logging.debug('RAW -> WRAPPED: ' + format_payload(payload))
 				yield common.protocol.payload(payload).write(self.wrapped_stream)
 		except Exception as e:
 			if not self.raw_stream.closed():
